@@ -16,11 +16,10 @@ prop_string_t PropertyStoreReadStringValue(
     LPWSTR str;
     if SUCCEEDED(::PropVariantToStringAlloc(var, &str)) {
       ::PropVariantClear(&var);
-
       return prop_string_t(str, CoTaskMemFree);
     }
   }
-
+  ::PropVariantClear(&var);
   return prop_string_t(nullptr, CoTaskMemFree);
 }
 
