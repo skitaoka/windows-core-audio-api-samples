@@ -27,3 +27,11 @@
 *.exe
 *.out
 *.app
+
+# MSVC
+.suo
+*.VC.opendb
+*.VC.db
+*.vcxproj.user
+x86
+x64
