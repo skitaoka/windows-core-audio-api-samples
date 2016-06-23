@@ -6,10 +6,35 @@
 #include <mmdeviceapi.h>
 #include <functiondiscoverykeys_devpkey.h>
 
+namespace {
+
 using prop_string_t = std::unique_ptr<WCHAR, decltype(&CoTaskMemFree)>;
 
-prop_string_t PropertyStoreReadStringValue(
-  IN Microsoft::WRL::ComPtr<IPropertyStore> prop, IN PROPERTYKEY const& key) {
+#define prop_string_null prop_string_t(nullptr, CoTaskMemFree)
+
+prop_string_t GetDeviceId(IN Microsoft::WRL::ComPtr<IMMDevice> const& device) {
+  LPWSTR buffer = nullptr;
+  if SUCCEEDED(device->GetId(&buffer)) {
+    return prop_string_t(buffer, CoTaskMemFree);
+  }
+  return prop_string_null;
+}
+
+std::wstring GetDeviceState(IN Microsoft::WRL::ComPtr<IMMDevice> const& device) {
+  DWORD state = 0;
+  if SUCCEEDED(device->GetState(&state)) {
+    switch (state) {
+    case DEVICE_STATE_ACTIVE: return L"ACTIVE";
+    case DEVICE_STATE_DISABLED: return L"DISABLED";
+    case DEVICE_STATE_NOTPRESENT: return L"NOTPRESENT";
+    case DEVICE_STATE_UNPLUGGED: return L"UNPLUGGED";
+    }
+  }
+  return L"UNKNOWN";
+}
+
+prop_string_t GetPropString(IN Microsoft::WRL::ComPtr<IPropertyStore> const& prop,
+                            IN PROPERTYKEY const& key) {
   PROPVARIANT var;
   ::PropVariantInit(&var);
   if SUCCEEDED(prop->GetValue(key, &var)) {
@@ -20,8 +45,10 @@ prop_string_t PropertyStoreReadStringValue(
     }
   }
   ::PropVariantClear(&var);
-  return prop_string_t(nullptr, CoTaskMemFree);
+  return prop_string_null;
 }
+
+} // end of anonymous namespace
 
 int main() {
   if SUCCEEDED(::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)) {
@@ -48,13 +75,20 @@ int main() {
           UINT uNumDevices;
           if SUCCEEDED(devices->GetCount(&uNumDevices)) {
             for (UINT i = 0; i < uNumDevices; ++i) {
-              // 各デバイスの情報を取得
+              // デバイスを取得
               Microsoft::WRL::ComPtr<IMMDevice> device;
               if SUCCEEDED(devices->Item(i, device.GetAddressOf())) {
+                // デバイスの情報を取得
+                auto const id = GetDeviceId(device); // デバイスID
+                auto const state = GetDeviceState(device); // デバイスの状態
+
                 Microsoft::WRL::ComPtr<IPropertyStore> prop;
                 if SUCCEEDED(device->OpenPropertyStore(STGM_READ, prop.GetAddressOf())) {
-                  auto description = PropertyStoreReadStringValue(prop, PKEY_Device_DeviceDesc);
-                  out << L"[" << i << L"] " << description.get() << L'\n';
+                  auto const name = GetPropString(prop, PKEY_Device_FriendlyName); // フルネーム
+                  auto const desc = GetPropString(prop, PKEY_Device_DeviceDesc); // ショートネーム
+                  auto const audioif = GetPropString(prop, PKEY_DeviceInterface_FriendlyName); // 物理デバイス名
+                  out << L"[" << i << L"] id=" << id.get() << L", state=" << state << L", name=" << name.get()
+                    << L", desc=" << desc.get() << L", audioif=" << audioif.get() << L'\n';
                 }
               }
             }
