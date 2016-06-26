@@ -57,7 +57,7 @@ int main() {
       if SUCCEEDED(::CoCreateInstance(__uuidof(MMDeviceEnumerator),
                                       nullptr,
                                       CLSCTX_INPROC_SERVER,
-                                      IID_PPV_ARGS(enumerator.GetAddressOf()))) {
+                                      IID_PPV_ARGS(enumerator.ReleaseAndGetAddressOf()))) {
 
         // 出力先デバイスを列挙
         Microsoft::WRL::ComPtr<IMMDeviceCollection> devices;
@@ -67,7 +67,7 @@ int main() {
                                                     // DEVICE_STATE_DISABLED: 無効化されている
                                                     // DEVICE_STATE_NOTPRESENT: システムに無登録
                                                     // DEVICE_STATE_UNPLUGGED: 物理的に接続されていない
-                                                    devices.GetAddressOf())) {
+                                                    devices.ReleaseAndGetAddressOf())) {
 
           std::wostringstream out;
 
@@ -77,13 +77,16 @@ int main() {
             for (UINT i = 0; i < uNumDevices; ++i) {
               // デバイスを取得
               Microsoft::WRL::ComPtr<IMMDevice> device;
-              if SUCCEEDED(devices->Item(i, device.GetAddressOf())) {
+              if SUCCEEDED(devices->Item(i, device.ReleaseAndGetAddressOf())) {
                 // デバイスの情報を取得
                 auto const id = GetDeviceId(device); // デバイスID
                 auto const state = GetDeviceState(device); // デバイスの状態
 
+                Microsoft::WRL::ComPtr<IMMEndpoint> endpoint;
+                device.As<IMMEndpoint>(&endpoint);
+
                 Microsoft::WRL::ComPtr<IPropertyStore> prop;
-                if SUCCEEDED(device->OpenPropertyStore(STGM_READ, prop.GetAddressOf())) {
+                if SUCCEEDED(device->OpenPropertyStore(STGM_READ, prop.ReleaseAndGetAddressOf())) {
                   auto const name = GetPropString(prop, PKEY_Device_FriendlyName); // フルネーム
                   auto const desc = GetPropString(prop, PKEY_Device_DeviceDesc); // ショートネーム
                   auto const audioif = GetPropString(prop, PKEY_DeviceInterface_FriendlyName); // 物理デバイス名
